@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include <unistd.h>
 
 #define BUFFER_LEN     64
 #define UNIX_PATH_MAX  128
@@ -18,6 +19,7 @@ int main()
     int socket2;
     
     char buffer[BUFFER_LEN];
+    double numbers[2];
     
     struct sockaddr_un server_addres;
     struct sockaddr_un client_addres;
@@ -41,13 +43,18 @@ int main()
     
     puts("Client connected.");
     
-    recv(socket2, buffer, BUFFER_LEN, 0);
-    printf("Receive : %s\n", buffer);
-    
-    buffer[0] = 'z';
-    
-    send(socket2, buffer, strlen(buffer), 0);
-    printf("Send    : %s\n", buffer);
+    while (1)
+    {
+        recv(socket2, (char *)numbers, BUFFER_LEN, 0);
+        //puts("recv");
+        //fflush(stdout);
+        
+        //usleep(2000);
+        
+        send(socket2, (char *)numbers, sizeof(double) * 2, 0);
+        //puts("send");
+        //fflush(stdout);
+    }
     
     puts("Connection closed.");
     
