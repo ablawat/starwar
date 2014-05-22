@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 
 #define BUFFER_LEN     64
@@ -35,14 +36,24 @@ void create_window(Display **display, Window *window, Pixmap *pixmap)
     *pixmap = XCreatePixmap(*display, *window, WINDOW_X, WINDOW_Y, 24);
 }
 
+void colors_alloc(Display **display, XColor *player_color)
+{
+    Colormap colormap = DefaultColormap(*display, DefaultScreen(*display));
+    XColor dummy;
+    
+    XAllocNamedColor(*display, colormap, "cyan", player_color, &dummy);
+}
+
 int main()
 {
     const char server_name[128] = "starwar-test-server";
     
     int client_socket;
     int result;
+    int n_events;
     
     char buffer[BUFFER_LEN];
+    double numbers[2];
     
     struct sockaddr_un server_addres;
     
@@ -51,7 +62,9 @@ int main()
     Display *display;
     Window   window;
     Pixmap   pixmap;
+    
     XEvent   event;
+    XColor   player_color;
     
     
     server_addres.sun_family = AF_UNIX;
@@ -68,25 +81,44 @@ int main()
     {
         puts("Connection to server established.");
         
-        strcpy(buffer, "abcd");
-        
-        send(client_socket, buffer, strlen(buffer), 0);
-        printf("Send    : %s\n", buffer);
-        
-        recv(client_socket, buffer, BUFFER_LEN, 0);
-        printf("Receive : %s\n", buffer);
+        numbers[0] = 20.0;
+        numbers[1] = 20.0;
         
         create_window(&display, &window, &pixmap);
+        colors_alloc(&display, &player_color);
+        
+        send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
         
         while (1)
         {
-            XNextEvent(display, &event);
+            recv(client_socket, (char *)numbers, BUFFER_LEN, 0);
             
-            if (event.type == KeyPress)
+            GC gc = DefaultGC(display, DefaultScreen(display));
+            
+            XSetForeground(display, gc, BlackPixel(display, DefaultScreen(display)));
+            XFillRectangle(display, pixmap, gc, 0, 0, WINDOW_X, WINDOW_Y);
+            
+            XSetForeground(display, gc, player_color.pixel);
+            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * numbers[0]) - 10, (int)((WINDOW_Y / 30.0) * numbers[1]) - 10, 20, 20);
+            
+            XCopyArea(display, pixmap, window, gc, 0, 0, WINDOW_X, WINDOW_Y, 0, 0);
+            XFlush(display);
+            
+            usleep(1000);
+            
+            n_events = XEventsQueued(display, QueuedAlready);
+            
+            if (n_events > 0)
             {
-                XCloseDisplay(display);
-                break;
+                XNextEvent(display, &event);
+                
+                if (event.type == KeyPress)
+                {
+                    numbers[0] += 0.10;
+                }
             }
+            
+            send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
         }
     }
     else
