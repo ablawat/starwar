@@ -12,7 +12,7 @@
 
 int main()
 {
-    const char server_name[128] = "starwar-server";
+    const char server_name[128] = "starwar-test-server";
     
     int socket1;
     int socket2;
@@ -48,6 +48,8 @@ int main()
     
     send(socket2, buffer, strlen(buffer), 0);
     printf("Send    : %s\n", buffer);
+    
+    puts("Connection closed.");
     
     close(socket2);
     close(socket1);
