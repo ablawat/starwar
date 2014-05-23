@@ -8,10 +8,13 @@
 #include <memory.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 #include "comunication.h"
+
+#define MLD 1000000000.0
 
 #define BUFFER_LEN     64
 #define UNIX_PATH_MAX  128
@@ -57,11 +60,19 @@ int main()
     int n_events;
     int send_to_server;
     
+    struct timespec ts1;
+    struct timespec ts2;
+    
+    double d_time;
+    
     char buffer[BUFFER_LEN];
     double position[2];
     double my_position[2];
     
     Movement player_move;
+    
+    int is_me_moveing;
+    int is_player_moveing;
     
     struct sockaddr_un server_addres;
     
@@ -101,6 +112,9 @@ int main()
         my_position[0] = 20.0;
         my_position[1] = 20.0;
         
+        is_me_moveing = 0;
+        is_player_moveing = 0;
+        
         create_window(&display, &window, &pixmap);
         colors_alloc(&display, &player_color);
         
@@ -111,22 +125,32 @@ int main()
         
         while (1)
         {
+            clock_gettime(CLOCK_REALTIME, &ts1);
+            
             result = recv(client_socket, (char *)&player_move, sizeof(Movement), 0);
             
             if (result == sizeof(Movement))
             {
+                if (player_move.direction != 0)
+                    is_player_moveing = 1;
+                else
+                    is_player_moveing = 0;
+            }
+            
+            if (is_player_moveing)
+            {
                 switch (player_move.direction)
                 {
-                    case 1: position[1] -= 2.0;
+                    case 1: position[1] -= 6.0 * d_time;
                             break;
                             
-                    case 2: position[1] += 2.0;
+                    case 2: position[1] += 6.0 * d_time;
                             break;
                             
-                    case 3: position[0] -= 2.0;
+                    case 3: position[0] -= 6.0 * d_time;
                             break;
                             
-                    case 4: position[0] += 2.0;
+                    case 4: position[0] += 6.0 * d_time;
                             break;
                 }
             }
@@ -168,7 +192,7 @@ int main()
                             player_key = 1;
                             send_to_server = 1;
                             
-                            my_position[1] -= 2.0;
+                            my_position[1] -= 6.0 * d_time;
                             
                             puts("Key Up pressed.");
                             fflush(stdout);
@@ -178,7 +202,7 @@ int main()
                             player_key = 2;
                             send_to_server = 1;
                             
-                            my_position[1] += 2.0;
+                            my_position[1] += 6.0 * d_time;
                             
                             puts("Key Down pressed.");
                             fflush(stdout);
@@ -188,7 +212,7 @@ int main()
                             player_key = 3;
                             send_to_server = 1;
                             
-                            my_position[0] -= 2.0;
+                            my_position[0] -= 6.0 * d_time;
                             
                             puts("Key Left pressed.");
                             fflush(stdout);
@@ -198,7 +222,7 @@ int main()
                             player_key = 4;
                             send_to_server = 1;
                             
-                            my_position[0] += 2.0;
+                            my_position[0] += 6.0 * d_time;
                             
                             puts("Key Right pressed.");
                             fflush(stdout);
@@ -269,8 +293,10 @@ int main()
                         
                         if (send_to_server)
                         {
-                            buffer[0] = 'b';
-                            send(client_socket, buffer, 1, 0);
+                            player_move.player_id = 0;
+                            player_move.direction = 0;
+                            
+                            send(client_socket, (char *)&player_move, sizeof(Movement), 0);
                             send_to_server = 0;
                         }
                     }
@@ -281,7 +307,9 @@ int main()
                 //usleep(100);
             }
             
-            //send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
+            clock_gettime(CLOCK_REALTIME, &ts2);
+            
+            d_time = (ts2.tv_sec + ts2.tv_nsec / MLD) - (ts1.tv_sec + ts1.tv_nsec / MLD);
         }
     }
     else
