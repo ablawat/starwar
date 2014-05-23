@@ -9,10 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "constraints.h"
 #include "comunication.h"
-
-#define BUFFER_LEN     64
-#define UNIX_PATH_MAX  128
 
 int main()
 {

@@ -12,15 +12,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
+#include "constraints.h"
 #include "comunication.h"
-
-#define MLD 1000000000.0
-
-#define BUFFER_LEN     64
-#define UNIX_PATH_MAX  128
-
-#define WINDOW_X       640
-#define WINDOW_Y       480
 
 void create_window(Display **display, Window *window, Pixmap *pixmap)
 {
@@ -73,6 +66,9 @@ int main()
     
     int is_me_moveing;
     int is_player_moveing;
+    
+    const int step_x = WINDOW_X / AREA_WIDTH;
+    const int step_y = WINDOW_Y / AREA_HEIGHT;
     
     struct sockaddr_un server_addres;
     
@@ -141,16 +137,16 @@ int main()
             {
                 switch (player_move.direction)
                 {
-                    case 1: position[1] -= 6.0 * d_time;
+                    case 1: position[1] -= MOVE_SPEED * d_time;
                             break;
                             
-                    case 2: position[1] += 6.0 * d_time;
+                    case 2: position[1] += MOVE_SPEED * d_time;
                             break;
                             
-                    case 3: position[0] -= 6.0 * d_time;
+                    case 3: position[0] -= MOVE_SPEED * d_time;
                             break;
                             
-                    case 4: position[0] += 6.0 * d_time;
+                    case 4: position[0] += MOVE_SPEED * d_time;
                             break;
                 }
             }
@@ -161,8 +157,8 @@ int main()
             XFillRectangle(display, pixmap, gc, 0, 0, WINDOW_X, WINDOW_Y);
             
             XSetForeground(display, gc, player_color.pixel);
-            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * my_position[0]) - 10, (int)((WINDOW_Y / 30.0) * my_position[1]) - 10, 20, 20);
-            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * position[0]) - 10, (int)((WINDOW_Y / 30.0) * position[1]) - 10, 20, 20);
+            XFillRectangle(display, pixmap, gc, (int)(step_x * my_position[0]) - 10, (int)(step_y * my_position[1]) - 10, 20, 20);
+            XFillRectangle(display, pixmap, gc, (int)(step_x * position[0]) - 10, (int)(step_y * position[1]) - 10, 20, 20);
             
             XCopyArea(display, pixmap, window, gc, 0, 0, WINDOW_X, WINDOW_Y, 0, 0);
             XFlush(display);
@@ -192,7 +188,7 @@ int main()
                             player_key = 1;
                             send_to_server = 1;
                             
-                            my_position[1] -= 6.0 * d_time;
+                            my_position[1] -= MOVE_SPEED * d_time;
                             
                             puts("Key Up pressed.");
                             fflush(stdout);
@@ -202,7 +198,7 @@ int main()
                             player_key = 2;
                             send_to_server = 1;
                             
-                            my_position[1] += 6.0 * d_time;
+                            my_position[1] += MOVE_SPEED * d_time;
                             
                             puts("Key Down pressed.");
                             fflush(stdout);
@@ -212,7 +208,7 @@ int main()
                             player_key = 3;
                             send_to_server = 1;
                             
-                            my_position[0] -= 6.0 * d_time;
+                            my_position[0] -= MOVE_SPEED * d_time;
                             
                             puts("Key Left pressed.");
                             fflush(stdout);
@@ -222,7 +218,7 @@ int main()
                             player_key = 4;
                             send_to_server = 1;
                             
-                            my_position[0] += 6.0 * d_time;
+                            my_position[0] += MOVE_SPEED * d_time;
                             
                             puts("Key Right pressed.");
                             fflush(stdout);
