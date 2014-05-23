@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -9,6 +10,8 @@
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+
+#include "comunication.h"
 
 #define BUFFER_LEN     64
 #define UNIX_PATH_MAX  128
@@ -52,9 +55,13 @@ int main()
     int client_socket;
     int result;
     int n_events;
+    int send_to_server;
     
     char buffer[BUFFER_LEN];
-    double numbers[2];
+    double position[2];
+    double my_position[2];
+    
+    Movement player_move;
     
     struct sockaddr_un server_addres;
     
@@ -84,19 +91,45 @@ int main()
     {
         puts("Connection to server established.");
         
-        numbers[0] = 20.0;
-        numbers[1] = 20.0;
+        int blocking = 1;
+        
+        ioctl(client_socket, FIONBIO, &blocking);
+        
+        position[0] = 20.0;
+        position[1] = 20.0;
+        
+        my_position[0] = 20.0;
+        my_position[1] = 20.0;
         
         create_window(&display, &window, &pixmap);
         colors_alloc(&display, &player_color);
         
-        send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
+        //send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
         
         player_key = 0;
+        send_to_server = 0;
         
         while (1)
         {
-            //recv(client_socket, (char *)numbers, BUFFER_LEN, 0);
+            result = recv(client_socket, (char *)&player_move, sizeof(Movement), 0);
+            
+            if (result == sizeof(Movement))
+            {
+                switch (player_move.direction)
+                {
+                    case 1: position[1] -= 2.0;
+                            break;
+                            
+                    case 2: position[1] += 2.0;
+                            break;
+                            
+                    case 3: position[0] -= 2.0;
+                            break;
+                            
+                    case 4: position[0] += 2.0;
+                            break;
+                }
+            }
             
             GC gc = DefaultGC(display, DefaultScreen(display));
             
@@ -104,7 +137,8 @@ int main()
             XFillRectangle(display, pixmap, gc, 0, 0, WINDOW_X, WINDOW_Y);
             
             XSetForeground(display, gc, player_color.pixel);
-            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * numbers[0]) - 10, (int)((WINDOW_Y / 30.0) * numbers[1]) - 10, 20, 20);
+            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * my_position[0]) - 10, (int)((WINDOW_Y / 30.0) * my_position[1]) - 10, 20, 20);
+            XFillRectangle(display, pixmap, gc, (int)((WINDOW_X / 40.0) * position[0]) - 10, (int)((WINDOW_Y / 30.0) * position[1]) - 10, 20, 20);
             
             XCopyArea(display, pixmap, window, gc, 0, 0, WINDOW_X, WINDOW_Y, 0, 0);
             XFlush(display);
@@ -132,27 +166,52 @@ int main()
                         if (key == XK_Up)
                         {
                             player_key = 1;
+                            send_to_server = 1;
+                            
+                            my_position[1] -= 2.0;
+                            
                             puts("Key Up pressed.");
                             fflush(stdout);
                         }
                         else if (key == XK_Down)
                         {
                             player_key = 2;
+                            send_to_server = 1;
+                            
+                            my_position[1] += 2.0;
+                            
                             puts("Key Down pressed.");
                             fflush(stdout);
                         }
                         else if (key == XK_Left)
                         {
                             player_key = 3;
+                            send_to_server = 1;
+                            
+                            my_position[0] -= 2.0;
+                            
                             puts("Key Left pressed.");
                             fflush(stdout);
                         }
                         else if (key == XK_Right)
                         {
                             player_key = 4;
+                            send_to_server = 1;
+                            
+                            my_position[0] += 2.0;
+                            
                             puts("Key Right pressed.");
                             fflush(stdout);
                         }
+                    }
+                    
+                    if (send_to_server)
+                    {
+                        player_move.player_id = 0;
+                        player_move.direction = player_key;
+                        
+                        send(client_socket, (char *)&player_move, sizeof(Movement), 0);
+                        send_to_server = 0;
                     }
                 }
                 if (event.type == KeyRelease)
@@ -181,27 +240,38 @@ int main()
                             if (key == XK_Up && player_key == 1)
                             {
                                 player_key = 0;
+                                send_to_server = 1;
                                 puts("Key Up released.");
                                 fflush(stdout);
                             }
                             else if (key == XK_Down && player_key == 2)
                             {
                                 player_key = 0;
+                                send_to_server = 1;
                                 puts("Key Down released.");
                                 fflush(stdout);
                             }
                             else if (key == XK_Left && player_key == 3)
                             {
                                 player_key = 0;
+                                send_to_server = 1;
                                 puts("Key Left released.");
                                 fflush(stdout);
                             }
                             else if (key == XK_Right && player_key == 4)
                             {
                                 player_key = 0;
+                                send_to_server = 1;
                                 puts("Key Right released.");
                                 fflush(stdout);
                             }
+                        }
+                        
+                        if (send_to_server)
+                        {
+                            buffer[0] = 'b';
+                            send(client_socket, buffer, 1, 0);
+                            send_to_server = 0;
                         }
                     }
                 }
