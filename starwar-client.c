@@ -30,7 +30,7 @@ void create_window(Display **display, Window *window, Pixmap *pixmap)
     
     *window = XCreateSimpleWindow(*display, DefaultRootWindow(*display), 0, 0, WINDOW_X, WINDOW_Y, 2, border, background);
     
-    XSelectInput(*display, *window, ExposureMask | KeyPressMask | KeyReleaseMask);
+    XSelectInput(*display, *window, KeyPressMask | KeyReleaseMask);
     XMapWindow(*display, *window);
     
     *pixmap = XCreatePixmap(*display, *window, WINDOW_X, WINDOW_Y, 24);
@@ -67,6 +67,8 @@ int main()
     int is_me_moveing;
     int is_player_moveing;
     
+    int is_running;
+    
     const int step_x = WINDOW_X / AREA_WIDTH;
     const int step_y = WINDOW_Y / AREA_HEIGHT;
     
@@ -75,6 +77,8 @@ int main()
     int addres_len;
     
     int player_key;
+    
+    int i;
     
     Display *display;
     Window   window;
@@ -114,10 +118,10 @@ int main()
         create_window(&display, &window, &pixmap);
         colors_alloc(&display, &player_color);
         
-        //send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
-        
         player_key = 0;
         send_to_server = 0;
+        
+        is_running = 1;
         
         while (1)
         {
@@ -163,12 +167,15 @@ int main()
             XCopyArea(display, pixmap, window, gc, 0, 0, WINDOW_X, WINDOW_Y, 0, 0);
             XFlush(display);
             
-            usleep(500);
+            usleep(1000);
             
             n_events = XEventsQueued(display, QueuedAlready);
             
-            if (n_events > 0)
+            for (i = n_events; i > 4; i--)
             {
+                printf("%d\n", n_events);
+                fflush(stdout);
+                
                 XNextEvent(display, &event);
                 
                 if (event.type == KeyPress)
@@ -177,7 +184,7 @@ int main()
                     
                     if ( key == XK_Escape)
                     {
-                        XCloseDisplay(display);
+                        is_running = 0;
                         break;
                     }
                     
@@ -241,12 +248,12 @@ int main()
                     if (XEventsQueued(display, QueuedAfterReading))
                     {
                         XEvent new;
-                        XPeekEvent(display, &new);
+                        XNextEvent(display, &new);
                         
                         if (new.type == KeyPress && new.xkey.time == event.xkey.time &&
                             new.xkey.keycode == event.xkey.keycode)
                         {
-                            XNextEvent (display, &event);
+                            XNextEvent(display, &event);
                             is_retriggered = 1;
                         }
                     }
@@ -298,14 +305,15 @@ int main()
                     }
                 }
             }
-            else
-            {
-                //usleep(100);
-            }
             
             clock_gettime(CLOCK_REALTIME, &ts2);
             
             d_time = (ts2.tv_sec + ts2.tv_nsec / MLD) - (ts1.tv_sec + ts1.tv_nsec / MLD);
+            
+            if (is_running == 0)
+            {
+                break;
+            }
         }
     }
     else
@@ -313,6 +321,7 @@ int main()
         puts("Connection to server refused.");
     }
     
+    XCloseDisplay(display);
     close(client_socket);
     
     return 0;
