@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -7,6 +8,8 @@
 #include <memory.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "comunication.h"
 
 #define BUFFER_LEN     64
 #define UNIX_PATH_MAX  128
@@ -17,14 +20,20 @@ int main()
     
     int socket1;
     int socket2;
+    int socket3;
     
     char buffer[BUFFER_LEN];
-    double numbers[2];
+    double position[2];
+    
+    Movement player_move;
     
     struct sockaddr_un server_addres;
-    struct sockaddr_un client_addres;
+    
+    struct sockaddr_un client_addres1;
+    struct sockaddr_un client_addres2;
     
     int addres_len;
+    int result;
     
     server_addres.sun_family = AF_UNIX;
     strcpy(server_addres.sun_path, server_name);
@@ -36,24 +45,48 @@ int main()
     
     listen(socket1, 10);
     
-    puts("Waiting for connection...");
-    
     addres_len = sizeof(struct sockaddr_un);
-    socket2 = accept(socket1, (struct sockaddr *)&client_addres, &addres_len);
     
-    puts("Client connected.");
+    puts("Waiting for connection...");
+    socket2 = accept(socket1, (struct sockaddr *)&client_addres1, &addres_len);
+    puts("Client 1 connected.");
+    
+    puts("Waiting for connection...");
+    socket3 = accept(socket1, (struct sockaddr *)&client_addres2, &addres_len);
+    puts("Client 2 connected.");
+    
+    int blocking = 1;
+    
+    ioctl(socket2, FIONBIO, &blocking);
+    ioctl(socket3, FIONBIO, &blocking);
     
     while (1)
     {
-        recv(socket2, (char *)numbers, BUFFER_LEN, 0);
-        //puts("recv");
-        //fflush(stdout);
+        result = recv(socket2, (char *)&player_move, BUFFER_LEN, 0);
+        
+        if (result == sizeof(Movement))
+        {
+            player_move.player_id = 1;
+            send(socket3, (char *)&player_move, sizeof(Movement), 0);
+            
+            puts("recv 1");
+            fflush(stdout);
+        }
         
         //usleep(2000);
         
-        send(socket2, (char *)numbers, sizeof(double) * 2, 0);
-        //puts("send");
-        //fflush(stdout);
+        result = recv(socket3, (char *)&player_move, sizeof(Movement), 0);
+        
+        if (result == sizeof(Movement))
+        {
+            player_move.player_id = 2;
+            send(socket2, (char *)&player_move, sizeof(Movement), 0);
+            
+            puts("recv 2");
+            fflush(stdout);
+        }
+        
+        usleep(500);
     }
     
     puts("Connection closed.");
