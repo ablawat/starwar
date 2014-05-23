@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
 #define BUFFER_LEN     64
 #define UNIX_PATH_MAX  128
@@ -30,7 +31,7 @@ void create_window(Display **display, Window *window, Pixmap *pixmap)
     
     *window = XCreateSimpleWindow(*display, DefaultRootWindow(*display), 0, 0, WINDOW_X, WINDOW_Y, 2, border, background);
     
-    XSelectInput(*display, *window, ExposureMask | KeyPressMask);
+    XSelectInput(*display, *window, ExposureMask | KeyPressMask | KeyReleaseMask);
     XMapWindow(*display, *window);
     
     *pixmap = XCreatePixmap(*display, *window, WINDOW_X, WINDOW_Y, 24);
@@ -58,6 +59,8 @@ int main()
     struct sockaddr_un server_addres;
     
     int addres_len;
+    
+    int player_key;
     
     Display *display;
     Window   window;
@@ -89,9 +92,11 @@ int main()
         
         send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
         
+        player_key = 0;
+        
         while (1)
         {
-            recv(client_socket, (char *)numbers, BUFFER_LEN, 0);
+            //recv(client_socket, (char *)numbers, BUFFER_LEN, 0);
             
             GC gc = DefaultGC(display, DefaultScreen(display));
             
@@ -104,7 +109,7 @@ int main()
             XCopyArea(display, pixmap, window, gc, 0, 0, WINDOW_X, WINDOW_Y, 0, 0);
             XFlush(display);
             
-            usleep(1000);
+            usleep(500);
             
             n_events = XEventsQueued(display, QueuedAlready);
             
@@ -114,11 +119,99 @@ int main()
                 
                 if (event.type == KeyPress)
                 {
-                    numbers[0] += 0.10;
+                    KeySym key = XLookupKeysym(& event.xkey, 0);
+                    
+                    if ( key == XK_Escape)
+                    {
+                        XCloseDisplay(display);
+                        break;
+                    }
+                    
+                    if (player_key == 0)
+                    {
+                        if (key == XK_Up)
+                        {
+                            player_key = 1;
+                            puts("Key Up pressed.");
+                            fflush(stdout);
+                        }
+                        else if (key == XK_Down)
+                        {
+                            player_key = 2;
+                            puts("Key Down pressed.");
+                            fflush(stdout);
+                        }
+                        else if (key == XK_Left)
+                        {
+                            player_key = 3;
+                            puts("Key Left pressed.");
+                            fflush(stdout);
+                        }
+                        else if (key == XK_Right)
+                        {
+                            player_key = 4;
+                            puts("Key Right pressed.");
+                            fflush(stdout);
+                        }
+                    }
+                }
+                if (event.type == KeyRelease)
+                {
+                    unsigned short is_retriggered = 0;
+                    
+                    if (XEventsQueued(display, QueuedAfterReading))
+                    {
+                        XEvent new;
+                        XPeekEvent(display, &new);
+                        
+                        if (new.type == KeyPress && new.xkey.time == event.xkey.time &&
+                            new.xkey.keycode == event.xkey.keycode)
+                        {
+                            XNextEvent (display, &event);
+                            is_retriggered = 1;
+                        }
+                    }
+                    
+                    if (!is_retriggered)
+                    {
+                        KeySym key = XLookupKeysym(& event.xkey, 0);
+                        
+                        if (player_key > 0)
+                        {
+                            if (key == XK_Up && player_key == 1)
+                            {
+                                player_key = 0;
+                                puts("Key Up released.");
+                                fflush(stdout);
+                            }
+                            else if (key == XK_Down && player_key == 2)
+                            {
+                                player_key = 0;
+                                puts("Key Down released.");
+                                fflush(stdout);
+                            }
+                            else if (key == XK_Left && player_key == 3)
+                            {
+                                player_key = 0;
+                                puts("Key Left released.");
+                                fflush(stdout);
+                            }
+                            else if (key == XK_Right && player_key == 4)
+                            {
+                                player_key = 0;
+                                puts("Key Right released.");
+                                fflush(stdout);
+                            }
+                        }
+                    }
                 }
             }
+            else
+            {
+                //usleep(100);
+            }
             
-            send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
+            //send(client_socket, (char *)numbers, sizeof(double) * 2, 0);
         }
     }
     else
