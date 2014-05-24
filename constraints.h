@@ -3,7 +3,7 @@
 
 #define MLD 1000000000.0
 
-#define BUFFER_LEN     64
+#define BUFFER_LEN     256
 #define UNIX_PATH_MAX  128
 
 #define WINDOW_X       640
