@@ -9,8 +9,18 @@
 #include <string.h>
 #include <unistd.h>
 
+typedef struct enemy
+{
+    double position_x;
+    double position_y;
+    
+    double moving_speed;
+}
+Enemy;
+
 #include "constraints.h"
 #include "comunication.h"
+
 
 int main()
 {
@@ -20,10 +30,16 @@ int main()
     int socket_client1;
     int socket_client2;
     
-    char buffer[BUFFER_LEN];
-    double position[2];
+    int player_id = 0;
     
-    Movement player_move;
+    char   *comunication_buffer = malloc(BUFFER_LEN);
+    size_t  comunication_len;
+    
+    Enemy *enemies = malloc(sizeof(Enemy) * 2);
+    unsigned int n_enemies = 2;
+    
+    Movement  object_movement;
+    Enemies  *all_enemies;
     
     struct sockaddr_un server_addres;
     
@@ -33,9 +49,17 @@ int main()
     int addres_len;
     int result;
     
+    
     server_addres.sun_family = AF_UNIX;
     strcpy(server_addres.sun_path, server_name);
     
+    enemies[0].position_x = 10.0;
+    enemies[0].position_y = 10.0;
+    enemies[0].moving_speed = 6.0;
+    
+    enemies[1].position_x = 30.0;
+    enemies[1].position_y = 15.0;
+    enemies[1].moving_speed = 10.0;
     
     socket_listen = socket(AF_UNIX, SOCK_STREAM, 0);
     
@@ -49,9 +73,24 @@ int main()
     socket_client1 = accept(socket_listen, (struct sockaddr *)&client_addres1, &addres_len);
     puts("Client 1 connected.");
     
+    send(socket_client1, (char *)&player_id, sizeof(int), 0);
+    
+    player_id++;
+    
     puts("Waiting for connection...");
     socket_client2 = accept(socket_listen, (struct sockaddr *)&client_addres2, &addres_len);
     puts("Client 2 connected.");
+    
+    send(socket_client2, (char *)&player_id, sizeof(int), 0);
+    
+    all_enemies = (Enemies *)comunication_buffer;
+    all_enemies -> size = n_enemies;
+    comunication_len = sizeof(Enemy) * n_enemies;
+    memcpy(&(all_enemies -> enemies), enemies, comunication_len);
+    comunication_len += sizeof(int);
+    
+    send(socket_client1, comunication_buffer, comunication_len, 0);
+    send(socket_client2, comunication_buffer, comunication_len, 0);
     
     int blocking = 1;
     
@@ -60,15 +99,14 @@ int main()
     
     while (1)
     {
-        result = recv(socket_client1, (char *)&player_move, BUFFER_LEN, 0);
+        result = recv(socket_client1, (char *)&object_movement, BUFFER_LEN, 0);
         
         if (result == sizeof(Movement))
         {
-            player_move.player_id = 1;
-            send(socket_client2, (char *)&player_move, sizeof(Movement), 0);
+            send(socket_client2, (char *)&object_movement, sizeof(Movement), 0);
             
-            puts("recv 1");
-            fflush(stdout);
+            //puts("recv 1");
+            //fflush(stdout);
         }
         else if (result == 0)
         {
@@ -81,15 +119,14 @@ int main()
         
         //...
         
-        result = recv(socket_client2, (char *)&player_move, sizeof(Movement), 0);
+        result = recv(socket_client2, (char *)&object_movement, sizeof(Movement), 0);
         
         if (result == sizeof(Movement))
         {
-            player_move.player_id = 2;
-            send(socket_client1, (char *)&player_move, sizeof(Movement), 0);
+            send(socket_client1, (char *)&object_movement, sizeof(Movement), 0);
             
-            puts("recv 2");
-            fflush(stdout);
+            //puts("recv 2");
+            //fflush(stdout);
         }
         else if (result == 0)
         {
@@ -100,7 +137,7 @@ int main()
             break;
         }
         
-        usleep(100);
+        //usleep(100);
     }
     
     puts("Connection closed.");
