@@ -99,7 +99,7 @@ int main()
     
     while (1)
     {
-        result = recv(socket_client1, (char *)&object_movement, BUFFER_LEN, 0);
+        result = recv(socket_client1, (char *)&object_movement, sizeof(Movement), 0);
         
         if (result == sizeof(Movement))
         {
